@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Turing Tag — Analyzer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F2F2F2;
+    --badge-a: #4A6580;
+    --badge-b: #4D1717;
+    --badge-c: #174D38;
+    --white: #FFFFFF;
+    --text-primary: #111111;
+    --text-secondary: #444444;
+    --border: #CBCBCB;
+    --tagline: #0A1F14;
+    --footer-text: #444444;
+    --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    --sans: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+    --container-max: 680px;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ===== LAYOUT ===== */
+  .app {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .header-tagline {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3.5px;
+    text-transform: uppercase;
+    color: var(--tagline);
+    margin-bottom: 12px;
+  }
+
+  .header-title {
+    font-family: var(--sans);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .header-subtitle {
+    font-family: var(--sans);
+    font-size: 15px;
+    color: var(--text-secondary);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ===== MODE TABS ===== */
+  .mode-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 40px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .mode-tab {
+    flex: 1;
+    padding: 12px 20px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    background: var(--white);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .mode-tab:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .mode-tab.active {
+    background: var(--text-primary);
+    color: var(--white);
+  }
+
+  .mode-tab:not(.active):hover {
+    background: var(--bg);
+  }
+
+  /* ===== MODE CONTAINERS ===== */
+  .mode-container {
+    display: none;
+  }
+
+  .mode-container.active {
+    display: block;
+  }
+
+  /* ===== STEPS INDICATOR ===== */
+  .steps {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+
+  .step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s ease, transform 0.3s ease;
+  }
+
+  .step-dot.active {
+    background: var(--text-secondary);
+    transform: scale(1.25);
+  }
+
+  .step-dot.completed {
+    background: var(--badge-c);
+  }
+
+  /* ===== PANELS ===== */
+  .panel {
+    display: none;
+    animation: fadeIn 0.35s ease;
+  }
+
+  .panel.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== TEXT INPUT ===== */
+  .text-input-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .text-input {
+    width: 100%;
+    min-height: 200px;
+    padding: 16px 18px;
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .text-input:focus {
+    border-color: var(--text-secondary);
+  }
+
+  .text-input::placeholder {
+    color: #999;
+  }
+
+  .char-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: right;
+    margin-top: 8px;
+  }
+
+  /* ===== QUESTIONNAIRE ===== */
+  .question-block {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 24px;
+    margin-bottom: 16px;
+  }
+
+  .question-number {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+
+  .question-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 18px;
+    line-height: 1.4;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .option {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  .option:hover {
+    border-color: var(--border);
+  }
+
+  .option.selected {
+    border-color: var(--text-primary);
+    background: var(--white);
+    font-weight: 600;
+  }
+
+  .option-radio {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    margin-right: 12px;
+    flex-shrink: 0;
+    position: relative;
+    transition: border-color 0.2s ease;
+  }
+
+  .option.selected .option-radio {
+    border-color: var(--text-primary);
+  }
+
+  .option.selected .option-radio::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-primary);
+  }
+
+  /* ===== RESULT / RECOMMENDATION ===== */
+  .result-section {
+    text-align: center;
+  }
+
+  .result-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+  }
+
+  .badge-display {
+    display: inline-flex;
+    border: 3px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .badge-letter-block {
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .badge-letter {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  .badge-label-block {
+    background: var(--white);
+    padding: 16px 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 160px;
+  }
+
+  .badge-label-title {
+    font-family: var(--sans);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .badge-label-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+
+  .rationale {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 24px;
+    margin-bottom: 28px;
+    text-align: left;
+  }
+
+  .rationale-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-family: var(--mono);
+    margin-bottom: 10px;
+  }
+
+  .rationale-text {
+    font-size: 15px;
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ===== OVERRIDE ===== */
+  .override-section {
+    margin-top: 32px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  .override-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+  }
+
+  .override-badges {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .override-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.5;
+  }
+
+  .override-badge:hover {
+    opacity: 0.8;
+  }
+
+  .override-badge.active {
+    opacity: 1;
+    border-color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .override-badge .mini-letter {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  .override-badge .mini-label {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--white);
+  }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 28px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-primary {
+    background: var(--text-primary);
+    color: var(--white);
+    border-color: var(--text-primary);
+  }
+
+  .btn-primary:hover {
+    background: #333;
+    border-color: #333;
+  }
+
+  .btn-primary:disabled {
+    background: var(--border);
+    border-color: var(--border);
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: var(--white);
+    color: var(--text-primary);
+    border-color: var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--text-primary);
+  }
+
+  .btn-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+  }
+
+  .btn-row-right {
+    justify-content: flex-end;
+  }
+
+  /* ===== FINAL OUTPUT ===== */
+  .final-output {
+    text-align: center;
+  }
+
+  .final-badge-wrap {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 36px 24px 28px;
+    margin-bottom: 24px;
+  }
+
+  .final-tagline {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--tagline);
+    margin-bottom: 20px;
+  }
+
+  .final-badge {
+    display: inline-flex;
+    border: 3px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .final-footer {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--footer-text);
+    margin-top: 12px;
+  }
+
+  .final-instructions {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+
+  .download-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-download svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .btn-download.generating {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .start-over {
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: var(--sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    margin-top: 16px;
+    transition: color 0.2s;
+  }
+
+  .start-over:hover {
+    color: var(--text-primary);
+  }
+
+  /* ===== ANALYZE MODE: SIGNALS ===== */
+  .signal-card {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    text-align: left;
+  }
+
+  .signal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .signal-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .signal-indicator {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+
+  .signal-indicator.ai-likely {
+    background: #E8EDF1;
+    color: var(--badge-a);
+  }
+
+  .signal-indicator.mixed {
+    background: #F0E4E4;
+    color: var(--badge-b);
+  }
+
+  .signal-indicator.human-likely {
+    background: #E2F0EA;
+    color: var(--badge-c);
+  }
+
+  .signal-detail {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .signal-meter {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    margin: 10px 0 6px;
+    overflow: hidden;
+  }
+
+  .signal-meter-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  .analyze-summary {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  .analyze-summary-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .analyze-verdict {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  .analyze-caveat {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    font-style: italic;
+    margin-top: 12px;
+  }
+
+  .analyze-loading {
+    text-align: center;
+    padding: 48px 24px;
+  }
+
+  .analyze-loading-text {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: 16px;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ===== APP FOOTER ===== */
+  .app-footer {
+    text-align: center;
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .app-footer-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--footer-text);
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 520px) {
+    .app { padding: 32px 16px 48px; }
+    .header-title { font-size: 22px; }
+    .badge-letter-block { width: 72px; height: 72px; }
+    .badge-letter { font-size: 38px; }
+    .badge-label-block { padding: 12px 18px; min-width: 120px; }
+    .badge-label-title { font-size: 18px; }
+    .result-actions { flex-direction: column; }
+    .btn { width: 100%; }
+    .mode-tabs { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-tagline">The Turing Tag</div>
+    <h1 class="header-title">Content Authorship Analyzer</h1>
+    <p class="header-subtitle" id="header-subtitle">A declaration tool, not a detector. Answer honestly about how you wrote your content, and we'll help you choose the right badge.</p>
+  </header>
+
+  <!-- MODE TABS -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="declare" id="tab-declare">Tag Your Work</button>
+    <button class="mode-tab" data-mode="analyze" id="tab-analyze">Analyze Content</button>
+  </div>
+
+  <!-- ============================== -->
+  <!-- MODE 1: DECLARE (original flow) -->
+  <!-- ============================== -->
+  <div class="mode-container active" id="mode-declare">
+
+    <!-- STEP DOTS -->
+    <div class="steps" id="declare-steps">
+      <div class="step-dot active" data-step="0"></div>
+      <div class="step-dot" data-step="1"></div>
+      <div class="step-dot" data-step="2"></div>
+      <div class="step-dot" data-step="3"></div>
+    </div>
+
+    <!-- PANEL 1: PASTE TEXT -->
+    <div class="panel active" id="panel-input">
+      <label class="text-input-label" for="content-input">Paste your post or content below</label>
+      <textarea
+        class="text-input"
+        id="content-input"
+        placeholder="Paste the text of your LinkedIn post, article, or any written content you want to tag..."
+      ></textarea>
+      <div class="char-count"><span id="char-count">0</span> characters</div>
+      <div class="btn-row btn-row-right">
+        <button class="btn btn-primary" id="btn-to-questions" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- PANEL 2: QUESTIONNAIRE -->
+    <div class="panel" id="panel-questions">
+      <div class="question-block" id="q1-block">
+        <div class="question-number">Question 1 of 4</div>
+        <div class="question-text">How did this content originate?</div>
+        <div class="options" data-question="q1">
+          <div class="option" data-value="ai-generated">
+            <div class="option-radio"></div>
+            <span>I gave an AI a prompt and used what it produced</span>
+          </div>
+          <div class="option" data-value="ai-drafted-edited">
+            <div class="option-radio"></div>
+            <span>AI produced a draft, then I substantially rewrote it</span>
+          </div>
+          <div class="option" data-value="human-drafted">
+            <div class="option-radio"></div>
+            <span>I wrote the first draft myself</span>
+          </div>
+          <div class="option" data-value="human-only">
+            <div class="option-radio"></div>
+            <span>I wrote every word myself, start to finish</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block" id="q2-block" style="display:none;">
+        <div class="question-number">Question 2 of 4</div>
+        <div class="question-text">Did AI help shape the ideas or arguments?</div>
+        <div class="options" data-question="q2">
+          <div class="option" data-value="ai-ideas">
+            <div class="option-radio"></div>
+            <span>Yes, the core ideas came from AI or were heavily shaped by it</span>
+          </div>
+          <div class="option" data-value="ai-refined">
+            <div class="option-radio"></div>
+            <span>My ideas, but I used AI to develop or refine them</span>
+          </div>
+          <div class="option" data-value="no-ai-ideas">
+            <div class="option-radio"></div>
+            <span>No, all ideas and arguments are mine</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block" id="q3-block" style="display:none;">
+        <div class="question-number">Question 3 of 4</div>
+        <div class="question-text">How was AI involved in editing or polish?</div>
+        <div class="options" data-question="q3">
+          <div class="option" data-value="ai-heavy-edit">
+            <div class="option-radio"></div>
+            <span>AI restructured, rewrote, or significantly altered my draft</span>
+          </div>
+          <div class="option" data-value="ai-light-edit">
+            <div class="option-radio"></div>
+            <span>I used AI for grammar, word choice, or minor suggestions</span>
+          </div>
+          <div class="option" data-value="spell-check">
+            <div class="option-radio"></div>
+            <span>Only basic spell-check or autocomplete</span>
+          </div>
+          <div class="option" data-value="no-ai-edit">
+            <div class="option-radio"></div>
+            <span>No AI was involved in editing</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block" id="q4-block" style="display:none;">
+        <div class="question-number">Question 4 of 4</div>
+        <div class="question-text">If someone read this aloud to you, would you recognize it as your voice?</div>
+        <div class="options" data-question="q4">
+          <div class="option" data-value="not-my-voice">
+            <div class="option-radio"></div>
+            <span>No, it doesn't sound like me at all</span>
+          </div>
+          <div class="option" data-value="partly-mine">
+            <div class="option-radio"></div>
+            <span>Parts of it, but not entirely</span>
+          </div>
+          <div class="option" data-value="mostly-mine">
+            <div class="option-radio"></div>
+            <span>Mostly, with some phrases I wouldn't naturally use</span>
+          </div>
+          <div class="option" data-value="fully-mine">
+            <div class="option-radio"></div>
+            <span>Every sentence sounds like me</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-back-input">Back</button>
+        <button class="btn btn-primary" id="btn-to-result" disabled>See Recommendation</button>
+      </div>
+    </div>
+
+    <!-- PANEL 3: RECOMMENDATION -->
+    <div class="panel" id="panel-result">
+      <div class="result-section">
+        <div class="result-label">Our Recommendation</div>
+        <div class="badge-display" id="result-badge">
+          <div class="badge-letter-block" id="result-letter-block">
+            <span class="badge-letter" id="result-letter"></span>
+          </div>
+          <div class="badge-label-block">
+            <div class="badge-label-title" id="result-title"></div>
+            <div class="badge-label-desc" id="result-desc"></div>
+          </div>
+        </div>
+        <div class="rationale">
+          <div class="rationale-title">Rationale</div>
+          <div class="rationale-text" id="result-rationale"></div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-primary" id="btn-accept">Accept This Badge</button>
+          <button class="btn btn-secondary" id="btn-back-questions">Revise Answers</button>
+        </div>
+        <div class="override-section">
+          <div class="override-label">Or choose a different badge:</div>
+          <div class="override-badges">
+            <div class="override-badge" data-badge="A" id="override-a">
+              <div class="mini-letter" style="background:var(--badge-a);">A</div>
+              <div class="mini-label">AI</div>
+            </div>
+            <div class="override-badge" data-badge="B" id="override-b">
+              <div class="mini-letter" style="background:var(--badge-b);">B</div>
+              <div class="mini-label">Blended</div>
+            </div>
+            <div class="override-badge" data-badge="C" id="override-c">
+              <div class="mini-letter" style="background:var(--badge-c);">C</div>
+              <div class="mini-label">Crafted</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 4: FINAL BADGE -->
+    <div class="panel" id="panel-final">
+      <div class="final-output">
+        <div class="final-badge-wrap" id="badge-capture">
+          <div class="final-tagline">The Turing Tag -- Voluntary Content Authorship Standard</div>
+          <div class="final-badge" id="final-badge">
+            <div class="badge-letter-block" id="final-letter-block">
+              <span class="badge-letter" id="final-letter"></span>
+            </div>
+            <div class="badge-label-block">
+              <div class="badge-label-title" id="final-title"></div>
+              <div class="badge-label-desc" id="final-desc"></div>
+            </div>
+          </div>
+          <div class="final-footer">Voluntary &middot; Self-Declared &middot; No Enforcement</div>
+        </div>
+        <div class="download-actions">
+          <button class="btn btn-primary btn-download" id="btn-download-png">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PNG
+          </button>
+          <button class="btn btn-secondary btn-download" id="btn-download-jpg">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download JPG
+          </button>
+        </div>
+        <p class="final-instructions">Download your badge and attach it to your post, or reference your tag in your content. The Turing Tag is voluntary and self-declared -- it means exactly as much as your word does.</p>
+        <button class="start-over" id="btn-restart">Start over</button>
+      </div>
+    </div>
+
+  </div><!-- end mode-declare -->
+
+  <!-- ============================== -->
+  <!-- MODE 2: ANALYZE (reader mode)  -->
+  <!-- ============================== -->
+  <div class="mode-container" id="mode-analyze">
+
+    <!-- ANALYZE: INPUT -->
+    <div class="panel active" id="analyze-input">
+      <label class="text-input-label" for="analyze-content-input">Paste any content you want to analyze</label>
+      <textarea
+        class="text-input"
+        id="analyze-content-input"
+        placeholder="Paste a LinkedIn post, article, email, or any text you've encountered and want to evaluate for AI authorship signals..."
+      ></textarea>
+      <div class="char-count"><span id="analyze-char-count">0</span> characters</div>
+      <div class="btn-row btn-row-right">
+        <button class="btn btn-primary" id="btn-run-analysis" disabled>Analyze</button>
+      </div>
+    </div>
+
+    <!-- ANALYZE: LOADING -->
+    <div class="panel" id="analyze-loading">
+      <div class="analyze-loading">
+        <div class="spinner"></div>
+        <div class="analyze-loading-text">Analyzing stylistic patterns...</div>
+      </div>
+    </div>
+
+    <!-- ANALYZE: RESULTS -->
+    <div class="panel" id="analyze-results">
+      <div class="analyze-summary">
+        <div class="analyze-summary-title">Overall Assessment</div>
+        <div class="badge-display" id="analyze-badge">
+          <div class="badge-letter-block" id="analyze-letter-block">
+            <span class="badge-letter" id="analyze-letter"></span>
+          </div>
+          <div class="badge-label-block">
+            <div class="badge-label-title" id="analyze-title"></div>
+            <div class="badge-label-desc" id="analyze-desc"></div>
+          </div>
+        </div>
+        <div class="analyze-verdict" id="analyze-verdict"></div>
+        <div class="analyze-caveat">This is a stylistic read, not a verdict. Heuristics can be wrong. A skilled prompter can produce text that reads as human, and a structured human writer can read as AI. Only the author truly knows.</div>
+      </div>
+
+      <div id="signal-cards"></div>
+
+      <div class="btn-row" style="margin-top:28px;">
+        <button class="btn btn-secondary" id="btn-analyze-back">Analyze Another</button>
+      </div>
+    </div>
+
+  </div><!-- end mode-analyze -->
+
+  <!-- APP FOOTER -->
+  <footer class="app-footer">
+    <div class="app-footer-text">Voluntary &middot; Self-Declared &middot; No Enforcement</div>
+  </footer>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== BADGE DATA =====
+  var BADGES = {
+    A: { letter: 'A', title: 'AI', desc: '100% AI generated.', color: 'var(--badge-a)', hex: '#4A6580' },
+    B: { letter: 'B', title: 'Blended', desc: 'Human written. AI consulted.', color: 'var(--badge-b)', hex: '#4D1717' },
+    C: { letter: 'C', title: 'Crafted', desc: '100% human written. No AI.', color: 'var(--badge-c)', hex: '#174D38' }
+  };
+
+  // ===========================
+  // MODE SWITCHING
+  // ===========================
+  var currentMode = 'declare';
+  var tabDeclare = document.getElementById('tab-declare');
+  var tabAnalyze = document.getElementById('tab-analyze');
+  var modeDeclare = document.getElementById('mode-declare');
+  var modeAnalyze = document.getElementById('mode-analyze');
+  var subtitle = document.getElementById('header-subtitle');
+
+  var subtitles = {
+    declare: 'A declaration tool, not a detector. Answer honestly about how you wrote your content, and we\'ll help you choose the right badge.',
+    analyze: 'Paste content you\'ve found and we\'ll read the stylistic signals. This is observation, not judgment -- only the author knows the truth.'
+  };
+
+  function switchMode(mode) {
+    currentMode = mode;
+    tabDeclare.classList.toggle('active', mode === 'declare');
+    tabAnalyze.classList.toggle('active', mode === 'analyze');
+    modeDeclare.classList.toggle('active', mode === 'declare');
+    modeAnalyze.classList.toggle('active', mode === 'analyze');
+    subtitle.textContent = subtitles[mode];
+
+    // Reset analyze mode panels when switching to it
+    if (mode === 'analyze') {
+      showAnalyzePanel('analyze-input');
+    }
+  }
+
+  tabDeclare.addEventListener('click', function() { switchMode('declare'); });
+  tabAnalyze.addEventListener('click', function() { switchMode('analyze'); });
+
+  // ===========================
+  // DECLARE MODE (original)
+  // ===========================
+  var declareState = {
+    currentPanel: 0,
+    content: '',
+    answers: { q1: null, q2: null, q3: null, q4: null },
+    questionsShown: 1,
+    recommendation: null,
+    selectedBadge: null
+  };
+
+  var panels = [
+    document.getElementById('panel-input'),
+    document.getElementById('panel-questions'),
+    document.getElementById('panel-result'),
+    document.getElementById('panel-final')
+  ];
+  var dots = document.querySelectorAll('#declare-steps .step-dot');
+  var textarea = document.getElementById('content-input');
+  var charCount = document.getElementById('char-count');
+  var btnToQuestions = document.getElementById('btn-to-questions');
+  var btnBackInput = document.getElementById('btn-back-input');
+  var btnToResult = document.getElementById('btn-to-result');
+  var btnBackQuestions = document.getElementById('btn-back-questions');
+  var btnAccept = document.getElementById('btn-accept');
+  var btnRestart = document.getElementById('btn-restart');
+
+  var qBlocks = [
+    document.getElementById('q1-block'),
+    document.getElementById('q2-block'),
+    document.getElementById('q3-block'),
+    document.getElementById('q4-block')
+  ];
+
+  function goToPanel(index) {
+    panels[declareState.currentPanel].classList.remove('active');
+    panels[index].classList.add('active');
+    declareState.currentPanel = index;
+    dots.forEach(function(dot, i) {
+      dot.classList.remove('active', 'completed');
+      if (i < index) dot.classList.add('completed');
+      if (i === index) dot.classList.add('active');
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  textarea.addEventListener('input', function() {
+    declareState.content = textarea.value;
+    charCount.textContent = declareState.content.length;
+    btnToQuestions.disabled = declareState.content.trim().length < 20;
+  });
+
+  btnToQuestions.addEventListener('click', function() {
+    if (declareState.content.trim().length >= 20) {
+      resetQuestions();
+      goToPanel(1);
+    }
+  });
+
+  function resetQuestions() {
+    declareState.answers = { q1: null, q2: null, q3: null, q4: null };
+    declareState.questionsShown = 1;
+    qBlocks.forEach(function(b, i) { b.style.display = i === 0 ? 'block' : 'none'; });
+    document.querySelectorAll('#panel-questions .option').forEach(function(o) { o.classList.remove('selected'); });
+    btnToResult.disabled = true;
+  }
+
+  document.getElementById('panel-questions').addEventListener('click', function(e) {
+    var option = e.target.closest('.option');
+    if (!option) return;
+    var questionKey = option.parentElement.getAttribute('data-question');
+    var value = option.getAttribute('data-value');
+    option.parentElement.querySelectorAll('.option').forEach(function(o) { o.classList.remove('selected'); });
+    option.classList.add('selected');
+    declareState.answers[questionKey] = value;
+    var qIndex = parseInt(questionKey.replace('q', '')) - 1;
+
+    if (questionKey === 'q1' && value === 'human-only') {
+      qBlocks[1].style.display = 'none';
+      qBlocks[2].style.display = 'none';
+      declareState.answers.q2 = 'no-ai-ideas';
+      declareState.answers.q3 = 'no-ai-edit';
+      showBlock(3);
+    } else if (questionKey === 'q1' && value === 'ai-generated') {
+      showBlock(1);
+    } else if (qIndex < 3) {
+      if (questionKey === 'q2' && declareState.answers.q1 === 'ai-generated') {
+        declareState.answers.q3 = 'ai-heavy-edit';
+        qBlocks[2].style.display = 'none';
+        showBlock(3);
+      } else {
+        showBlock(qIndex + 1);
+      }
+    }
+    updateResultButton();
+  });
+
+  function showBlock(index) {
+    if (index < qBlocks.length) {
+      qBlocks[index].style.display = 'block';
+      qBlocks[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (index + 1 > declareState.questionsShown) declareState.questionsShown = index + 1;
+    }
+  }
+
+  function updateResultButton() {
+    var needed = ['q1', 'q4'];
+    if (declareState.answers.q1 !== 'human-only') needed.push('q2');
+    if (declareState.answers.q1 !== 'human-only' && declareState.answers.q1 !== 'ai-generated') needed.push('q3');
+    var allAnswered = needed.every(function(k) { return declareState.answers[k] !== null; });
+    btnToResult.disabled = !allAnswered;
+  }
+
+  // Declaration analysis engine (swappable for API)
+  function analyzeDeclaration(content, answers) {
+    var score = 0;
+    var originScores = { 'ai-generated': 0, 'ai-drafted-edited': 2, 'human-drafted': 7, 'human-only': 10 };
+    score += (originScores[answers.q1] || 5);
+    var ideaScores = { 'ai-ideas': 0, 'ai-refined': 3, 'no-ai-ideas': 6 };
+    score += (ideaScores[answers.q2] || 3);
+    var editScores = { 'ai-heavy-edit': 0, 'ai-light-edit': 3, 'spell-check': 5, 'no-ai-edit': 6 };
+    score += (editScores[answers.q3] || 3);
+    var voiceScores = { 'not-my-voice': 0, 'partly-mine': 2, 'mostly-mine': 4, 'fully-mine': 6 };
+    score += (voiceScores[answers.q4] || 3);
+
+    var badge, rationale;
+    if (score <= 6) {
+      badge = 'A';
+      rationale = 'Based on your answers, this content was primarily generated by AI. The ideas, structure, and language originated from an AI system with minimal human intervention. That\'s a valid way to create content -- the Turing Tag just asks you to say so.';
+    } else if (score <= 15) {
+      badge = 'B';
+      rationale = 'This looks like a genuine collaboration between you and AI. ';
+      if (answers.q1 === 'ai-drafted-edited') {
+        rationale += 'You started with an AI draft and shaped it into something closer to your own voice. ';
+      } else if (answers.q1 === 'human-drafted') {
+        rationale += 'You wrote the original draft and brought AI in to help develop or polish it. ';
+      }
+      rationale += 'The Blended tag covers a wide range of human-AI collaboration, and that range is the point.';
+    } else {
+      badge = 'C';
+      rationale = 'Your answers indicate this is your own work -- your ideas, your words, your voice. ';
+      if (answers.q3 === 'spell-check') {
+        rationale += 'Basic spell-check and autocomplete don\'t change the authorship. ';
+      }
+      rationale += 'The Crafted tag means you\'re putting your name on every sentence.';
+    }
+    return { badge: badge, rationale: rationale, score: score };
+  }
+
+  function showResult(badgeKey, rationale) {
+    var badge = BADGES[badgeKey];
+    document.getElementById('result-letter').textContent = badge.letter;
+    document.getElementById('result-letter-block').style.background = badge.color;
+    document.getElementById('result-title').textContent = badge.title;
+    document.getElementById('result-desc').textContent = badge.desc;
+    document.getElementById('result-rationale').textContent = rationale;
+    document.querySelectorAll('.override-badge').forEach(function(el) {
+      el.classList.toggle('active', el.getAttribute('data-badge') === badgeKey);
+    });
+    declareState.selectedBadge = badgeKey;
+  }
+
+  function showFinalBadge(badgeKey) {
+    var badge = BADGES[badgeKey];
+    document.getElementById('final-letter').textContent = badge.letter;
+    document.getElementById('final-letter-block').style.background = badge.color;
+    document.getElementById('final-title').textContent = badge.title;
+    document.getElementById('final-desc').textContent = badge.desc;
+  }
+
+  btnToResult.addEventListener('click', function() {
+    var result = analyzeDeclaration(declareState.content, declareState.answers);
+    declareState.recommendation = result;
+    declareState.selectedBadge = result.badge;
+    showResult(result.badge, result.rationale);
+    goToPanel(2);
+  });
+
+  document.querySelectorAll('.override-badge').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var badgeKey = el.getAttribute('data-badge');
+      var rationale;
+      if (badgeKey === declareState.recommendation.badge) {
+        rationale = declareState.recommendation.rationale;
+      } else {
+        rationale = 'You\'ve chosen to override the recommendation. The Turing Tag is self-declared -- you know your process better than any algorithm does.';
+      }
+      showResult(badgeKey, rationale);
+    });
+  });
+
+  btnAccept.addEventListener('click', function() {
+    showFinalBadge(declareState.selectedBadge);
+    goToPanel(3);
+  });
+
+  btnBackInput.addEventListener('click', function() { goToPanel(0); });
+  btnBackQuestions.addEventListener('click', function() { goToPanel(1); });
+
+  // Download
+  function downloadBadge(format) {
+    var captureEl = document.getElementById('badge-capture');
+    var btn = document.getElementById('btn-download-' + format);
+    var originalText = btn.innerHTML;
+    btn.classList.add('generating');
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Generating...';
+
+    html2canvas(captureEl, {
+      scale: 3, backgroundColor: '#FFFFFF', useCORS: true, logging: false
+    }).then(function(canvas) {
+      var link = document.createElement('a');
+      var badgeName = 'turing-tag-' + declareState.selectedBadge.toLowerCase();
+      if (format === 'png') {
+        link.download = badgeName + '.png';
+        link.href = canvas.toDataURL('image/png');
+      } else {
+        link.download = badgeName + '.jpg';
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+      }
+      link.click();
+      btn.classList.remove('generating');
+      btn.innerHTML = originalText;
+    }).catch(function(err) {
+      console.error('Download failed:', err);
+      btn.classList.remove('generating');
+      btn.innerHTML = originalText;
+    });
+  }
+
+  document.getElementById('btn-download-png').addEventListener('click', function() { downloadBadge('png'); });
+  document.getElementById('btn-download-jpg').addEventListener('click', function() { downloadBadge('jpg'); });
+
+  btnRestart.addEventListener('click', function() {
+    declareState.content = '';
+    declareState.answers = { q1: null, q2: null, q3: null, q4: null };
+    declareState.recommendation = null;
+    declareState.selectedBadge = null;
+    textarea.value = '';
+    charCount.textContent = '0';
+    btnToQuestions.disabled = true;
+    resetQuestions();
+    goToPanel(0);
+  });
+
+  // ===========================
+  // ANALYZE MODE
+  // ===========================
+  var analyzeTextarea = document.getElementById('analyze-content-input');
+  var analyzeCharCount = document.getElementById('analyze-char-count');
+  var btnRunAnalysis = document.getElementById('btn-run-analysis');
+  var btnAnalyzeBack = document.getElementById('btn-analyze-back');
+
+  var analyzePanels = {
+    'analyze-input': document.getElementById('analyze-input'),
+    'analyze-loading': document.getElementById('analyze-loading'),
+    'analyze-results': document.getElementById('analyze-results')
+  };
+
+  function showAnalyzePanel(id) {
+    Object.keys(analyzePanels).forEach(function(key) {
+      analyzePanels[key].classList.toggle('active', key === id);
+    });
+    if (id === 'analyze-input') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  analyzeTextarea.addEventListener('input', function() {
+    analyzeCharCount.textContent = analyzeTextarea.value.length;
+    btnRunAnalysis.disabled = analyzeTextarea.value.trim().length < 50;
+  });
+
+  // ===== HEURISTIC TEXT ANALYSIS ENGINE (swappable for API) =====
+  function analyzeContentHeuristic(text) {
+    var sentences = text.split(/[.!?]+/).filter(function(s) { return s.trim().length > 0; });
+    var words = text.split(/\s+/).filter(function(w) { return w.length > 0; });
+    var wordCount = words.length;
+
+    // 1. Sentence length variance
+    var sentLengths = sentences.map(function(s) { return s.trim().split(/\s+/).length; });
+    var avgSentLen = sentLengths.reduce(function(a, b) { return a + b; }, 0) / (sentLengths.length || 1);
+    var sentVariance = 0;
+    sentLengths.forEach(function(len) { sentVariance += Math.pow(len - avgSentLen, 2); });
+    sentVariance = Math.sqrt(sentVariance / (sentLengths.length || 1));
+    var sentVarianceNorm = Math.min(sentVariance / avgSentLen, 1.5);
+    // Low variance = more AI-like (AI tends toward uniform sentence length)
+    var sentVarianceScore = sentVarianceNorm < 0.3 ? 0.2 : sentVarianceNorm < 0.5 ? 0.4 : sentVarianceNorm < 0.7 ? 0.6 : 0.85;
+
+    // 2. Vocabulary diversity (type-token ratio)
+    var uniqueWords = {};
+    words.forEach(function(w) { uniqueWords[w.toLowerCase().replace(/[^a-z']/g, '')] = true; });
+    var ttr = Object.keys(uniqueWords).length / (wordCount || 1);
+    // Adjust for text length (TTR naturally decreases with length)
+    var adjustedTTR = ttr * Math.pow(wordCount / 100, 0.15);
+    var vocabScore = adjustedTTR < 0.45 ? 0.25 : adjustedTTR < 0.55 ? 0.4 : adjustedTTR < 0.65 ? 0.6 : 0.8;
+
+    // 3. Hedging and filler patterns (AI loves these)
+    var hedgePatterns = [
+      /\bin today's (rapidly )?(evolving|changing|digital|fast-paced)/gi,
+      /\bit's (important|worth|crucial|essential) to (note|remember|understand|consider)/gi,
+      /\blet's (dive|explore|unpack|delve|take a look)/gi,
+      /\b(at the end of the day|when it comes to|in terms of|when all is said and done)\b/gi,
+      /\b(moreover|furthermore|additionally|consequently|nevertheless)\b/gi,
+      /\b(game.?changer|paradigm shift|cutting.?edge|groundbreaking|innovative solution)\b/gi,
+      /\b(leverage|synergy|optimize|streamline|holistic)\b/gi,
+      /\b(navigat(e|ing) the (complex|ever|challenging))/gi,
+      /\b(here's the (thing|deal|reality|truth))\b/gi,
+      /\b(excited to (share|announce))\b/gi,
+      /\b(humbled|thrilled|honored) (to|and|by)\b/gi
+    ];
+    var hedgeCount = 0;
+    hedgePatterns.forEach(function(pat) {
+      var matches = text.match(pat);
+      if (matches) hedgeCount += matches.length;
+    });
+    var hedgeDensity = hedgeCount / (sentences.length || 1);
+    var hedgeScore = hedgeDensity > 0.3 ? 0.15 : hedgeDensity > 0.15 ? 0.3 : hedgeDensity > 0.05 ? 0.55 : 0.85;
+
+    // 4. Paragraph structure regularity
+    var paragraphs = text.split(/\n\s*\n/).filter(function(p) { return p.trim().length > 0; });
+    var paraLengths = paragraphs.map(function(p) { return p.trim().split(/\s+/).length; });
+    var paraVariance = 0;
+    if (paraLengths.length > 1) {
+      var avgParaLen = paraLengths.reduce(function(a, b) { return a + b; }, 0) / paraLengths.length;
+      paraLengths.forEach(function(len) { paraVariance += Math.pow(len - avgParaLen, 2); });
+      paraVariance = Math.sqrt(paraVariance / paraLengths.length) / (avgParaLen || 1);
+    }
+    var structureScore = paraLengths.length <= 1 ? 0.5 :
+      paraVariance < 0.2 ? 0.25 : paraVariance < 0.4 ? 0.45 : paraVariance < 0.6 ? 0.65 : 0.8;
+
+    // 5. Personal voice markers (contractions, first person, informal language)
+    var personalPatterns = [
+      /\b(I'm|I've|I'd|I'll|can't|won't|don't|doesn't|isn't|wasn't|weren't|shouldn't|couldn't|wouldn't)\b/g,
+      /\b(honestly|frankly|look,|listen,|hell,|damn)\b/gi,
+      /\b(weird|stupid|nuts|crazy|wild|brutal|rough)\b/gi,
+      /\.\.\./g,
+      /\b(anyway|anyhow|y'all|gonna|wanna|kinda|sorta)\b/gi
+    ];
+    var personalCount = 0;
+    personalPatterns.forEach(function(pat) {
+      var matches = text.match(pat);
+      if (matches) personalCount += matches.length;
+    });
+    var personalDensity = personalCount / (sentences.length || 1);
+    var voiceScore = personalDensity < 0.1 ? 0.2 : personalDensity < 0.3 ? 0.4 : personalDensity < 0.6 ? 0.65 : 0.9;
+
+    // 6. Transition pattern (AI uses very regular transition patterns)
+    var transitionPatterns = [
+      /^(first(ly)?|second(ly)?|third(ly)?|finally|in conclusion|to summarize|in summary)/gim,
+      /^(however|that said|on the other hand|conversely|in contrast)/gim,
+      /^(for (example|instance)|specifically|in particular)/gim
+    ];
+    var transitionCount = 0;
+    transitionPatterns.forEach(function(pat) {
+      var matches = text.match(pat);
+      if (matches) transitionCount += matches.length;
+    });
+    var transitionDensity = transitionCount / (paragraphs.length || 1);
+    var transitionScore = transitionDensity > 0.5 ? 0.2 : transitionDensity > 0.25 ? 0.4 : transitionDensity > 0.1 ? 0.6 : 0.8;
+
+    // Composite score (weighted)
+    var composite = (
+      sentVarianceScore * 0.15 +
+      vocabScore * 0.15 +
+      hedgeScore * 0.25 +
+      structureScore * 0.1 +
+      voiceScore * 0.2 +
+      transitionScore * 0.15
+    );
+
+    // Map to badge
+    var badge, verdict;
+    if (composite < 0.35) {
+      badge = 'A';
+      verdict = 'This text shows several patterns common in AI-generated content, including uniform sentence structure, formulaic transitions, and corporate phrasing. These are signals, not proof.';
+    } else if (composite < 0.6) {
+      badge = 'B';
+      verdict = 'This text shows a mix of signals. Some patterns suggest AI involvement while others suggest human authorship. This is consistent with AI-assisted writing, or with a human who writes in a structured, formal style.';
+    } else {
+      badge = 'C';
+      verdict = 'This text shows patterns more typical of human authorship, including varied sentence rhythm, personal voice markers, and irregular structure. That said, a skilled prompt engineer can produce similar results.';
+    }
+
+    var signals = [
+      {
+        name: 'Sentence Rhythm',
+        score: sentVarianceScore,
+        detail: sentVarianceScore < 0.4
+          ? 'Sentences are very uniform in length (avg ' + Math.round(avgSentLen) + ' words, low variance). AI tends to produce metronomic sentence patterns.'
+          : sentVarianceScore < 0.65
+          ? 'Moderate sentence length variation (avg ' + Math.round(avgSentLen) + ' words). Could go either way.'
+          : 'Sentences vary significantly in length and rhythm (avg ' + Math.round(avgSentLen) + ' words, high variance). More typical of natural human writing.'
+      },
+      {
+        name: 'Vocabulary Range',
+        score: vocabScore,
+        detail: vocabScore < 0.4
+          ? 'Relatively limited vocabulary diversity. AI tends to cycle through a narrower word pool.'
+          : vocabScore < 0.65
+          ? 'Moderate vocabulary range. Not a strong signal in either direction.'
+          : 'Rich and varied word choice across the text. More common in human writing.'
+      },
+      {
+        name: 'Stock Phrases & Filler',
+        score: hedgeScore,
+        detail: hedgeScore < 0.35
+          ? 'Heavy use of stock phrases and corporate filler language (' + hedgeCount + ' instances). This is one of the strongest AI signals.'
+          : hedgeScore < 0.6
+          ? 'Some formulaic phrases present (' + hedgeCount + ' instances). Common in both AI and professional writing.'
+          : 'Very few stock phrases or filler patterns. The language feels more specific and deliberate.'
+      },
+      {
+        name: 'Personal Voice',
+        score: voiceScore,
+        detail: voiceScore < 0.35
+          ? 'Almost no personal voice markers, contractions, or informal language. The tone is consistently neutral and polished.'
+          : voiceScore < 0.65
+          ? 'Some personal voice present but mixed with more formal passages.'
+          : 'Strong personal voice with contractions, informal language, and individual style markers throughout.'
+      },
+      {
+        name: 'Structural Regularity',
+        score: structureScore,
+        detail: structureScore < 0.4
+          ? 'Very regular paragraph structure. AI tends to produce evenly-sized blocks of text.'
+          : structureScore < 0.65
+          ? 'Moderately regular structure. Not conclusive in either direction.'
+          : 'Irregular paragraph lengths and structure. More typical of organic human writing.'
+      },
+      {
+        name: 'Transition Patterns',
+        score: transitionScore,
+        detail: transitionScore < 0.35
+          ? 'Heavy use of formulaic transitions (firstly, however, in conclusion). AI defaults to these structural crutches.'
+          : transitionScore < 0.65
+          ? 'Some standard transitions present. Common in both AI and organized human writing.'
+          : 'Transitions are natural or absent. The text flows without leaning on standard connective phrases.'
+      }
+    ];
+
+    return {
+      badge: badge,
+      verdict: verdict,
+      composite: composite,
+      signals: signals,
+      wordCount: wordCount,
+      sentenceCount: sentences.length
+    };
+  }
+
+  // Run analysis
+  btnRunAnalysis.addEventListener('click', function() {
+    var text = analyzeTextarea.value.trim();
+    if (text.length < 50) return;
+
+    showAnalyzePanel('analyze-loading');
+
+    // Brief delay for the loading state to register visually
+    setTimeout(function() {
+      var result = analyzeContentHeuristic(text);
+      renderAnalyzeResults(result);
+      showAnalyzePanel('analyze-results');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 800);
+  });
+
+  function renderAnalyzeResults(result) {
+    var badge = BADGES[result.badge];
+    document.getElementById('analyze-letter').textContent = badge.letter;
+    document.getElementById('analyze-letter-block').style.background = badge.color;
+    document.getElementById('analyze-title').textContent = badge.title;
+    document.getElementById('analyze-desc').textContent = badge.desc;
+    document.getElementById('analyze-verdict').textContent = result.verdict;
+
+    var cardsHTML = '';
+    result.signals.forEach(function(sig) {
+      var indicator, indicatorClass, barColor;
+      if (sig.score < 0.4) {
+        indicator = 'AI-Typical';
+        indicatorClass = 'ai-likely';
+        barColor = BADGES.A.hex;
+      } else if (sig.score < 0.65) {
+        indicator = 'Mixed';
+        indicatorClass = 'mixed';
+        barColor = BADGES.B.hex;
+      } else {
+        indicator = 'Human-Typical';
+        indicatorClass = 'human-likely';
+        barColor = BADGES.C.hex;
+      }
+
+      cardsHTML += '<div class="signal-card">' +
+        '<div class="signal-header">' +
+          '<span class="signal-name">' + sig.name + '</span>' +
+          '<span class="signal-indicator ' + indicatorClass + '">' + indicator + '</span>' +
+        '</div>' +
+        '<div class="signal-meter"><div class="signal-meter-fill" style="width:' + Math.round(sig.score * 100) + '%;background:' + barColor + ';"></div></div>' +
+        '<div class="signal-detail">' + sig.detail + '</div>' +
+      '</div>';
+    });
+
+    document.getElementById('signal-cards').innerHTML = cardsHTML;
+  }
+
+  btnAnalyzeBack.addEventListener('click', function() {
+    analyzeTextarea.value = '';
+    analyzeCharCount.textContent = '0';
+    btnRunAnalysis.disabled = true;
+    showAnalyzePanel('analyze-input');
+  });
+
+})();
+</script>
+
+</body>
+</html>
