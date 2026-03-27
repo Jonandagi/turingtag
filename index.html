@@ -1425,26 +1425,26 @@
     var words = text.split(/\s+/).filter(function(w) { return w.length > 0; });
     var wordCount = words.length;
 
-    // 1. Sentence length variance
+    // 1. Sentence length variance (weight: 0.12)
     var sentLengths = sentences.map(function(s) { return s.trim().split(/\s+/).length; });
     var avgSentLen = sentLengths.reduce(function(a, b) { return a + b; }, 0) / (sentLengths.length || 1);
     var sentVariance = 0;
     sentLengths.forEach(function(len) { sentVariance += Math.pow(len - avgSentLen, 2); });
     sentVariance = Math.sqrt(sentVariance / (sentLengths.length || 1));
     var sentVarianceNorm = Math.min(sentVariance / avgSentLen, 1.5);
-    // Low variance = more AI-like (AI tends toward uniform sentence length)
     var sentVarianceScore = sentVarianceNorm < 0.3 ? 0.2 : sentVarianceNorm < 0.5 ? 0.4 : sentVarianceNorm < 0.7 ? 0.6 : 0.85;
 
-    // 2. Vocabulary diversity (type-token ratio)
+    // 2. Vocabulary diversity (type-token ratio) (weight: 0.10)
     var uniqueWords = {};
     words.forEach(function(w) { uniqueWords[w.toLowerCase().replace(/[^a-z']/g, '')] = true; });
     var ttr = Object.keys(uniqueWords).length / (wordCount || 1);
-    // Adjust for text length (TTR naturally decreases with length)
     var adjustedTTR = ttr * Math.pow(wordCount / 100, 0.15);
     var vocabScore = adjustedTTR < 0.45 ? 0.25 : adjustedTTR < 0.55 ? 0.4 : adjustedTTR < 0.65 ? 0.6 : 0.8;
 
-    // 3. Hedging and filler patterns (AI loves these)
+    // 3. Stock phrases & AI filler (weight: 0.35)
+    // Expanded to catch LinkedIn/outreach AI patterns specifically.
     var hedgePatterns = [
+      // Generic AI patterns
       /\bin today's (rapidly )?(evolving|changing|digital|fast-paced)/gi,
       /\bit's (important|worth|crucial|essential) to (note|remember|understand|consider)/gi,
       /\blet's (dive|explore|unpack|delve|take a look)/gi,
@@ -1455,7 +1455,36 @@
       /\b(navigat(e|ing) the (complex|ever|challenging))/gi,
       /\b(here's the (thing|deal|reality|truth))\b/gi,
       /\b(excited to (share|announce))\b/gi,
-      /\b(humbled|thrilled|honored) (to|and|by)\b/gi
+      /\b(humbled|thrilled|honored) (to|and|by)\b/gi,
+      // LinkedIn cold outreach AI openers
+      /\b(no fluff|i'?ll (keep it|be) (real|honest|direct|straight))\b/gi,
+      /\b(i'?ll cut to the chase|let me be (direct|straight|real|frank))\b/gi,
+      /\b(reached? out (directly|to you))\b/gi,
+      /\b(wanted to (reach out|connect|touch base))\b/gi,
+      // Hollow congratulations + pivot structure
+      /\bcongrats on (surpassing|hitting|reaching|achieving|your)/gi,
+      /\b(what (really |truly )?grabbed me|what (really |truly )?caught my (eye|attention))\b/gi,
+      /\b(it'?s not just the|isn'?t just the) (headline|numbers|surface|top.?line)\b/gi,
+      /\b(the (operational|strategic|business) (puzzle|challenge|opportunity) (underneath|behind|within))\b/gi,
+      // Performative self-positioning
+      /\b(i'?ve spent (years|my career|a decade))\b/gi,
+      /\b(right.?hand (operator|person|partner))\b/gi,
+      /\b(vision into execution|strategy into (action|results|reality))\b/gi,
+      /\b(operational backbone|operational (engine|foundation|core))\b/gi,
+      /\b(buttoned.?up|running clean|a step ahead)\b/gi,
+      /\b(without (constantly )?(fighting fires|dropping balls|missing))\b/gi,
+      /\b(focus on (growth|the big picture|what matters))\b/gi,
+      /\b(moves? fast (and )?thinks? big)\b/gi,
+      // Corporate infrastructure buzzwords
+      /\b(forecasting systems?|operating models?|automation layers?|centers? of excellence)\b/gi,
+      /\b(cross.?functional (teams?|operating|infrastructure|collaboration))\b/gi,
+      /\b(domestic and international (teams?|operations?))\b/gi,
+      /\b(at (scale|an? (organizational|enterprise|large) scale))\b/gi,
+      // Generic competence signaling
+      /\b(kind of (challenge|work|problem) I (genuinely )?(get excited|love|thrive on))\b/gi,
+      /\b(genuinely (excited|interested|passionate|engaged))\b/gi,
+      /\b(from what I can tell)\b/gi,
+      /\b(i'?d want to be the (person|one|operator))\b/gi
     ];
     var hedgeCount = 0;
     hedgePatterns.forEach(function(pat) {
@@ -1463,9 +1492,9 @@
       if (matches) hedgeCount += matches.length;
     });
     var hedgeDensity = hedgeCount / (sentences.length || 1);
-    var hedgeScore = hedgeDensity > 0.3 ? 0.15 : hedgeDensity > 0.15 ? 0.3 : hedgeDensity > 0.05 ? 0.55 : 0.85;
+    var hedgeScore = hedgeDensity > 0.4 ? 0.1 : hedgeDensity > 0.2 ? 0.25 : hedgeDensity > 0.08 ? 0.5 : 0.85;
 
-    // 4. Paragraph structure regularity
+    // 4. Paragraph structure regularity (weight: 0.10)
     var paragraphs = text.split(/\n\s*\n/).filter(function(p) { return p.trim().length > 0; });
     var paraLengths = paragraphs.map(function(p) { return p.trim().split(/\s+/).length; });
     var paraVariance = 0;
@@ -1477,13 +1506,16 @@
     var structureScore = paraLengths.length <= 1 ? 0.5 :
       paraVariance < 0.2 ? 0.25 : paraVariance < 0.4 ? 0.45 : paraVariance < 0.6 ? 0.65 : 0.8;
 
-    // 5. Personal voice markers (contractions, first person, informal language)
+    // 5. Personal voice markers (weight: 0.15)
+    // Tightened: contractions alone no longer score as human. AI uses them freely now.
     var personalPatterns = [
-      /\b(I'm|I've|I'd|I'll|can't|won't|don't|doesn't|isn't|wasn't|weren't|shouldn't|couldn't|wouldn't)\b/g,
-      /\b(honestly|frankly|look,|listen,|hell,|damn)\b/gi,
-      /\b(weird|stupid|nuts|crazy|wild|brutal|rough)\b/gi,
+      /\b(honestly|frankly|look,|listen,|hell,|damn|shit|god)\b/gi,
+      /\b(weird|stupid|nuts|crazy|wild|brutal|rough|dumb|absurd)\b/gi,
       /\.\.\./g,
-      /\b(anyway|anyhow|y'all|gonna|wanna|kinda|sorta)\b/gi
+      /\b(anyway|anyhow|y'all|gonna|wanna|kinda|sorta|nope|yep|yeah)\b/gi,
+      /\b(my (kid|kids|dog|wife|husband|partner|mom|dad|friend|boss))\b/gi,
+      /\b(last (week|month|year|night|tuesday|monday|wednesday|thursday|friday))\b/gi,
+      /\(([^)]{3,25})\)/g
     ];
     var personalCount = 0;
     personalPatterns.forEach(function(pat) {
@@ -1491,13 +1523,14 @@
       if (matches) personalCount += matches.length;
     });
     var personalDensity = personalCount / (sentences.length || 1);
-    var voiceScore = personalDensity < 0.1 ? 0.2 : personalDensity < 0.3 ? 0.4 : personalDensity < 0.6 ? 0.65 : 0.9;
+    var voiceScore = personalDensity < 0.05 ? 0.2 : personalDensity < 0.15 ? 0.35 : personalDensity < 0.35 ? 0.6 : 0.9;
 
-    // 6. Transition pattern (AI uses very regular transition patterns)
+    // 6. Transition patterns (weight: 0.13)
+    // BUG FIX: removed ^ line-start anchor -- was missing mid-paragraph occurrences.
     var transitionPatterns = [
-      /^(first(ly)?|second(ly)?|third(ly)?|finally|in conclusion|to summarize|in summary)/gim,
-      /^(however|that said|on the other hand|conversely|in contrast)/gim,
-      /^(for (example|instance)|specifically|in particular)/gim
+      /\b(first(ly)?|second(ly)?|third(ly)?|finally,?|in conclusion|to summarize|in summary)\b/gi,
+      /\b(however,?|that said,?|on the other hand,?|conversely,?|in contrast)\b/gi,
+      /\b(for (example|instance),?|specifically,?|in particular)\b/gi
     ];
     var transitionCount = 0;
     transitionPatterns.forEach(function(pat) {
@@ -1507,27 +1540,47 @@
     var transitionDensity = transitionCount / (paragraphs.length || 1);
     var transitionScore = transitionDensity > 0.5 ? 0.2 : transitionDensity > 0.25 ? 0.4 : transitionDensity > 0.1 ? 0.6 : 0.8;
 
-    // Composite score (weighted)
+    // 7. Hollow specificity (weight: 0.10) -- NEW SIGNAL
+    // AI names metrics, roles, and concepts to mimic genuine knowledge without depth.
+    var hollowSpecificityPatterns = [
+      /\$\d+[MKB]?\s*(ARR|MRR|revenue|run rate)/gi,
+      /\d+x\s*(growth|scale|revenue)/gi,
+      /\b(dual.?sided (platform|marketplace|model))\b/gi,
+      /\b(connecting (thousands?|hundreds?|millions?) of)\b/gi,
+      /\b(scaling .{3,30} (simultaneously|at once|across))\b/gi,
+      /\b(complex (engine|machine|system|infrastructure) to run)\b/gi,
+      /\b(without the wheels? (coming off|falling off))\b/gi
+    ];
+    var hollowCount = 0;
+    hollowSpecificityPatterns.forEach(function(pat) {
+      var matches = text.match(pat);
+      if (matches) hollowCount += matches.length;
+    });
+    var hollowDensity = hollowCount / (sentences.length || 1);
+    var hollowScore = hollowDensity > 0.2 ? 0.1 : hollowDensity > 0.1 ? 0.3 : hollowDensity > 0.03 ? 0.6 : 0.85;
+
+    // Composite score (weights sum to 1.0)
     var composite = (
-      sentVarianceScore * 0.15 +
-      vocabScore * 0.15 +
-      hedgeScore * 0.25 +
-      structureScore * 0.1 +
-      voiceScore * 0.2 +
-      transitionScore * 0.15
+      sentVarianceScore * 0.12 +
+      vocabScore        * 0.10 +
+      hedgeScore        * 0.35 +
+      structureScore    * 0.10 +
+      voiceScore        * 0.15 +
+      transitionScore   * 0.13 +
+      hollowScore       * 0.10
     );
 
     // Map to badge
     var badge, verdict;
     if (composite < 0.35) {
       badge = 'A';
-      verdict = 'This text shows several patterns common in AI-generated content, including uniform sentence structure, formulaic transitions, and corporate phrasing. These are signals, not proof.';
+      verdict = 'This text shows several patterns strongly associated with AI-generated content: formulaic phrasing, hollow specificity, and an absence of genuine personal voice markers. These are signals, not proof -- only the author knows.';
     } else if (composite < 0.6) {
       badge = 'B';
-      verdict = 'This text shows a mix of signals. Some patterns suggest AI involvement while others suggest human authorship. This is consistent with AI-assisted writing, or with a human who writes in a structured, formal style.';
+      verdict = 'This text shows a mix of signals. Some patterns suggest AI involvement or heavy editing, while others suggest human authorship. This is consistent with AI-assisted writing, or a human who writes in a structured, professional style.';
     } else {
       badge = 'C';
-      verdict = 'This text shows patterns more typical of human authorship, including varied sentence rhythm, personal voice markers, and irregular structure. That said, a skilled prompt engineer can produce similar results.';
+      verdict = 'This text shows patterns more typical of human authorship: varied rhythm, specific personal references, and organic structure. That said, a skilled prompt engineer can produce similar results. Only the author truly knows.';
     }
 
     var signals = [
@@ -1537,8 +1590,8 @@
         detail: sentVarianceScore < 0.4
           ? 'Sentences are very uniform in length (avg ' + Math.round(avgSentLen) + ' words, low variance). AI tends to produce metronomic sentence patterns.'
           : sentVarianceScore < 0.65
-          ? 'Moderate sentence length variation (avg ' + Math.round(avgSentLen) + ' words). Could go either way.'
-          : 'Sentences vary significantly in length and rhythm (avg ' + Math.round(avgSentLen) + ' words, high variance). More typical of natural human writing.'
+          ? 'Moderate sentence length variation (avg ' + Math.round(avgSentLen) + ' words). Not a strong signal either way.'
+          : 'Sentences vary significantly in length and rhythm (avg ' + Math.round(avgSentLen) + ' words). More typical of natural human writing.'
       },
       {
         name: 'Vocabulary Range',
@@ -1547,34 +1600,34 @@
           ? 'Relatively limited vocabulary diversity. AI tends to cycle through a narrower word pool.'
           : vocabScore < 0.65
           ? 'Moderate vocabulary range. Not a strong signal in either direction.'
-          : 'Rich and varied word choice across the text. More common in human writing.'
+          : 'Rich and varied word choice. More common in human writing.'
       },
       {
         name: 'Stock Phrases & Filler',
         score: hedgeScore,
         detail: hedgeScore < 0.35
-          ? 'Heavy use of stock phrases and corporate filler language (' + hedgeCount + ' instances). This is one of the strongest AI signals.'
+          ? 'Heavy use of stock phrases, corporate filler, and AI outreach language (' + hedgeCount + ' instances). This is one of the strongest signals of AI-generated content.'
           : hedgeScore < 0.6
           ? 'Some formulaic phrases present (' + hedgeCount + ' instances). Common in both AI and professional writing.'
-          : 'Very few stock phrases or filler patterns. The language feels more specific and deliberate.'
+          : 'Very few stock phrases. The language feels specific and deliberate.'
       },
       {
         name: 'Personal Voice',
         score: voiceScore,
         detail: voiceScore < 0.35
-          ? 'Almost no personal voice markers, contractions, or informal language. The tone is consistently neutral and polished.'
+          ? 'Almost no genuine personal voice markers -- no informal language, colloquialisms, or specific personal references. Contractions alone don\'t count; AI uses those freely.'
           : voiceScore < 0.65
-          ? 'Some personal voice present but mixed with more formal passages.'
-          : 'Strong personal voice with contractions, informal language, and individual style markers throughout.'
+          ? 'Some personal voice present, but mixed with polished, neutral passages.'
+          : 'Strong personal voice: informal language, specific references, individual style throughout.'
       },
       {
-        name: 'Structural Regularity',
-        score: structureScore,
-        detail: structureScore < 0.4
-          ? 'Very regular paragraph structure. AI tends to produce evenly-sized blocks of text.'
-          : structureScore < 0.65
-          ? 'Moderately regular structure. Not conclusive in either direction.'
-          : 'Irregular paragraph lengths and structure. More typical of organic human writing.'
+        name: 'Hollow Specificity',
+        score: hollowScore,
+        detail: hollowScore < 0.35
+          ? 'This text names specific metrics, roles, or concepts (' + hollowCount + ' instances) without going deeper than the surface. AI routinely uses named details to mimic genuine knowledge.'
+          : hollowScore < 0.65
+          ? 'Some surface-level specificity present. Not conclusive on its own.'
+          : 'References are grounded and substantive rather than decorative.'
       },
       {
         name: 'Transition Patterns',
